@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Access Granted</title>
+    <title>Successful OAuth</title>
 </head>
 <body>
-    <p>Successfully access granted, for user's phone {{ user_phone }}.</p>
+    <h1>OAuth Was Successful</h1>
+    <h2>You can now do one of these things</h2>
+    <h3>Get User phone number</h3>
+    <form method="get">
+     {% csrf_token %}
+        {{ get_phone_form.as_p }}
+        <button type="button" onclick="location.href='{% url 'oauth_get_phone' %}'">Get User phone number</button>
+    </form>
+    <h3>Create Approved Addon</h3>
+    <form method="get">
+        <button type="button" onclick="location.href='{% url 'oauth_approved_addon_form' %}'">Create Approved Addon</button>
+    </form>
 </body>
 </html>
