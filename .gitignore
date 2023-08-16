@@ -1,0 +1,43 @@
+.cache/
+htmlcov/
+.coverage
+__pycache__
+
+# IDE
+divar-post-api.iml
+.settings/org.eclipse.core.resources.prefs
+.pydevproject
+.settings/
+.vscode/
+.idea/
+
+# C extensions
+*.so
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# OS X
+.DS_Store
+
+*.pyc
+db.sqlite3
+.DS_Store
+__pycache__
+.directory
+node_modules/
+webpack-stats.json
+webpack-stats-prod.json
+client/dist
+static
+.idea
+tags
+
+# Virtualenv
+env
+venv
+.venv/
+
+k8s/generated/
+jsonnet

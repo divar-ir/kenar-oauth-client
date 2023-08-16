@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Login Form</title>
+</head>
+<body>
+    <h1>Redirect to divar</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">redirect to get permissions</button>
+    </form>
+</body>
+</html>
