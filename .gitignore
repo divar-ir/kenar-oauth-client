@@ -38,6 +38,7 @@ tags
 env
 venv
 .venv/
+.env
 
 k8s/generated/
 jsonnet

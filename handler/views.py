@@ -1,19 +1,18 @@
-import json
 import random
-from datetime import datetime
+import re
 
-import pytz
-import requests
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from oauthlib.oauth2.rfc6749.clients import WebApplicationClient
 
-from handler.forms import OAuthLoginForm
+from handler import oauth_client
+from handler.forms import OAuthLoginForm, OAuthGetPhoneForm, OAuthCreateApprovedAddonForm
 from handler.models import Oauth, Scope
-from handler.oauth_configs import OAUTH_CLIENT_ID, OAUTH_AUTHORIZATION_URL, OAUTH_REDIRECT_URI, OAUTH_CLIENT_SECRET, \
-    OAUTH_TOKEN_URL, OAUTH_INFO_SESSION_KEY, GET_USER_URL
 
-client = WebApplicationClient(client_id=OAUTH_CLIENT_ID)
+client = WebApplicationClient(client_id=settings.OAUTH_CLIENT_ID)
+
+scope_regex = re.compile(r"^(?P<permission_type>([A-Z]+_)*([A-Z]+))(__(?P<resource_id>.+))?$")
 
 
 def oauth_login_form(request):
@@ -29,58 +28,103 @@ def oauth_login_form(request):
 
 
 def oauth_login(request, resource_id):
-    scope = [f'ADDON_USER_APPROVED__{resource_id}', 'USER_PHONE']
+    scopes = [f'ADDON_USER_APPROVED__{resource_id}', 'USER_PHONE']
     state = random.randint(1000, 9999)
-    url = client.prepare_request_uri(
-        OAUTH_AUTHORIZATION_URL,
-        redirect_uri=OAUTH_REDIRECT_URI,
-        scope=scope,
+
+    oauth_url = client.prepare_request_uri(
+        settings.OAUTH_AUTHORIZATION_URL,
+        redirect_uri=settings.OAUTH_REDIRECT_URI,
+        scope=scopes,
         state=state
     )
-    request.session[OAUTH_INFO_SESSION_KEY] = {"state": str(state), "scope": scope}
-    return redirect(url)
+
+    request.session[settings.OAUTH_INFO_SESSION_KEY] = {"state": str(state), "scopes": scopes}
+    return redirect(oauth_url)
 
 
 def oauth_callback(request):
     code = request.GET.get("code")
     state = request.GET.get("state")
-    state_in_session, scope = request.session.get(OAUTH_INFO_SESSION_KEY)["state"], \
-                              request.session.get(OAUTH_INFO_SESSION_KEY)["scope"]
+    state_in_session, scopes = request.session.get(settings.OAUTH_INFO_SESSION_KEY)["state"], \
+        request.session.get(settings.OAUTH_INFO_SESSION_KEY)["scopes"]
     if not code or state != state_in_session:
         return JsonResponse({"status": "access denied"})
-    data = dict(
-        code=code,
-        redirect_uri=OAUTH_REDIRECT_URI,
-        client_id=OAUTH_CLIENT_ID,
-        client_secret=OAUTH_CLIENT_SECRET,
-        grant_type='authorization_code',
-    )
-    response = requests.post(
-        OAUTH_TOKEN_URL,
-        json=data,
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
-    token = client.parse_request_body_response(response.text)
-    access_token, refresh_token, expires = token['access_token'], token['refresh_token'], token['expires']
-    oauth = Oauth.objects.create(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        expires=datetime.fromtimestamp(int(expires)).replace(tzinfo=pytz.utc)
-    )
-    for s in scope:
-        permission_resource_tup = s.split('__')
+
+    if Oauth.objects.filter(session_id=request.session.session_key).exists():
+        Oauth.objects.get(session_id=request.session.session_key).delete()
+
+    oauth = oauth_client.create(code=code, session_id=request.session.session_key)
+    oauth.save()
+
+    scopes_permissions = []
+    for s in scopes:
+        scope_match_groups = scope_regex.search(s).groupdict()
+        scopes_permissions.append(scope_match_groups['permission_type'])
+
         Scope.objects.create(
-            permission_type=permission_resource_tup[0],
-            resource_id=permission_resource_tup[1] if len(permission_resource_tup) > 1 else None,
+            permission_type=scope_match_groups['permission_type'],
+            resource_id=scope_match_groups.setdefault('resource_id', None),
             oauth=oauth
         )
-    response = requests.post(
-        GET_USER_URL,
-        json={},
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            'x-api-key': OAUTH_CLIENT_SECRET,
-            'x-access-token': access_token
+
+    return render(
+        request,
+        'access_success.html',
+        {
+            'permissions': scopes_permissions,
+            'get_phone_form': OAuthGetPhoneForm(),
+            'create_approved_addon_form': OAuthCreateApprovedAddonForm()
         }
     )
-    return render(request, 'access_success.html', {'user_phone': json.loads(response.content)["phone_numbers"]})
+
+
+def oauth_get_phone(request):
+    form = OAuthGetPhoneForm(request.POST)
+    if not form.is_valid():
+        raise Exception("invalid input")
+
+    oauth = Oauth.objects.get(session_id=request.session.session_key)
+    oauth.has_phone_number_scope()
+    phone = oauth_client.get_phone_numbers(oauth.access_token)
+
+    return render(
+        request,
+        'phone_number.html',
+        {
+            'phone_number': phone[0]
+        }
+    )
+
+
+def oauth_approved_addon(request, token):
+    return render(
+        request,
+        'approved_addon.html',
+        {
+            'token': token,
+        }
+    )
+
+
+def oauth_create_approved_addon_form(request):
+    if request.method == "POST":
+        form = OAuthCreateApprovedAddonForm(request.POST)
+        if form.is_valid():
+            widgets = form.cleaned_data["widgets"]
+        else:
+            raise Exception("invalid input")
+
+        oauth = Oauth.objects.get(session_id=request.session.session_key)
+        token = oauth.approved_addon_token()
+        oauth_client.create_approved_addon(oauth.access_token, widgets, token)
+
+        return redirect('oauth_approved_addon', token=token)
+    else:
+        return render(
+            request,
+            'approved_addon_form.html',
+            {
+                'form': OAuthCreateApprovedAddonForm(),
+            }
+        )
+

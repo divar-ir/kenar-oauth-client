@@ -15,17 +15,26 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# OAUTH settings
+OAUTH_AUTHORIZATION_URL = 'https://open-platform-redirect.divar.ir/oauth'
+OAUTH_CLIENT_ID = os.environ.get('APP_SLUG', "YOUR APP SLUG")
+OAUTH_CLIENT_SECRET = os.environ.get("OAUTH_SECRET", "YOUR OAUTH API KEY")
+OAUTH_REDIRECT_URI = 'http://localhost:8000/auth/callback'
+OAUTH_TOKEN_URL = 'https://api.divar.ir/v1/open-platform/oauth/access_token'
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+GET_USER_ENDPOINT = 'https://api.divar.ir/v1/open-platform/users'
+CREATE_ADDON_ENDPOINT = 'https://api.divar.ir/v1/open-platform/add-ons/post/{token}'
+
+OAUTH_INFO_SESSION_KEY = 'oauth_state'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-1h@^t7bjm82^dilt07p4u@)_b817plx*jpvvz&u*r-_(+(5#j6'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+DEBUG_TOKEN = ""
 
-ALLOWED_HOSTS = ['127.0.0.1', '37.152.177.35', 'nastaran.kemoon.top']
+ALLOWED_HOSTS = ['127.0.0.1', '37.152.177.35', 'localhost']
 
 
 # Application definition
@@ -128,7 +137,7 @@ STATIC_ROOT = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CSRF_TRUSTED_ORIGINS = ['https://nastaran.kemoon.top']
+CSRF_TRUSTED_ORIGINS = ['http://localhost', 'http://127.0.0.1']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
