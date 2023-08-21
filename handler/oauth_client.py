@@ -43,7 +43,7 @@ def create_approved_addon(access_token, widgets, token):
     )
 
     if resp.status_code != 200:
-        raise Exception("could not create approved addon", resp)
+        raise Exception("could not create approved addon", resp.status_code, resp.content)
 
 
 def get_phone_numbers(access_token) -> List[str]:
@@ -57,6 +57,6 @@ def get_phone_numbers(access_token) -> List[str]:
         }
     )
     if resp.status_code != 200:
-        raise Exception("could not get phone number", resp)
+        raise Exception("could not get phone number", resp.status_code, resp.content)
 
     return resp.json().get("phone_numbers")
